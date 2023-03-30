@@ -57,7 +57,7 @@ mod tests {
         let transform_2 = transform(1.1, 0., 0.);
         let gjk = GJK2::new();
         assert!(gjk
-            .intersect(&line, &transform_1, &rectangle, &transform_2)
+            .intersect(&line, &transform_1, &rectangle, &transform_2, false)
             .is_some());
     }
 }
