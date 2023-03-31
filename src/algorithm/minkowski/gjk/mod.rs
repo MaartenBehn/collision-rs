@@ -105,7 +105,6 @@ where
         left_transform: &TL,
         right: &PR,
         right_transform: &TR,
-        use_nesterov_acceleration: bool
     ) -> Option<Simplex<P>>
     where
         P: EuclideanSpace<Scalar = S>,
@@ -116,10 +115,6 @@ where
         TL: Transform<P>,
         TR: Transform<P>,
     {
-        if use_nesterov_acceleration {
-            return self.intersect_nesterov_accelerated(left, left_transform, right, right_transform);
-        }
-
         let left_pos = left_transform.transform_point(P::origin());
         let right_pos = right_transform.transform_point(P::origin());
         let mut d = right_pos - left_pos;
@@ -383,7 +378,7 @@ where
         SP: SimplexProcessor<Point = P>,
     {
         use CollisionStrategy::*;
-        self.intersect(left, left_transform, right, right_transform, false)
+        self.intersect(left, left_transform, right, right_transform)
             .and_then(|simplex| match *strategy {
                 CollisionOnly => Some(Contact::new(CollisionOnly)),
                 FullResolution => self.get_contact_manifold(
@@ -666,7 +661,7 @@ mod tests {
         let right_transform = transform(-15., 0., 0.);
         let gjk = GJK2::new();
         assert!(gjk
-            .intersect(&left, &left_transform, &right, &right_transform, false)
+            .intersect(&left, &left_transform, &right, &right_transform)
             .is_none());
         assert!(gjk
             .intersection(
@@ -686,7 +681,7 @@ mod tests {
         let right = Rectangle::new(10., 10.);
         let right_transform = transform(7., 2., 0.);
         let gjk = GJK2::new();
-        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform, false);
+        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform);
         assert!(simplex.is_some());
         let contact = gjk.intersection(
             &CollisionStrategy::FullResolution,
@@ -709,7 +704,7 @@ mod tests {
         let right = Cuboid::new(10., 10., 10.);
         let right_transform = transform_3d(7., 2., 0., 0.);
         let gjk = GJK3::new();
-        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform, false);
+        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform);
         assert!(simplex.is_some());
         let contact = gjk.intersection(
             &CollisionStrategy::FullResolution,

@@ -1,62 +1,55 @@
-use std::ops::{Neg, Add};
+use std::ops::Neg;
 
-use cgmath::{EuclideanSpace, BaseFloat, InnerSpace, Zero, Array, UlpsEq, Transform, vec3, Vector3};
+use cgmath::{BaseFloat, InnerSpace, Zero, Array, Transform, vec3, Vector3, Point3};
 
-use crate::{algorithm::minkowski::{EPA, SupportPoint}, Primitive};
+use crate::{algorithm::minkowski::SupportPoint, Primitive};
 
-use super::{GJK, SimplexProcessor, simplex::Simplex};
+use super::{simplex::Simplex, GJK3};
 
 
-struct NesterovData<S, P>
+struct NesterovData<S>
 where
     S: BaseFloat,
-    P: EuclideanSpace<Scalar = S>,
 {
     alpha: S,
     omega: S,
 
-    simplex: Simplex<P>,
+    simplex: Simplex<Point3<S>>,
     ray: Vector3<S>,
     ray_len: S,
     ray_dir: Vector3<S>,
 
-    support_point: SupportPoint<P>,
+    support_point: SupportPoint<Point3<S>>,
 }
 
 
-impl<SP, E, S> GJK<SP, E, S>
+impl<S> GJK3<S>
 where
-    SP: SimplexProcessor,
-    SP::Point: EuclideanSpace<Scalar = S>,
-    E: EPA<Point = SP::Point>,
     S: BaseFloat,
 {
-    pub fn intersect_nesterov_accelerated<P, PL, PR, TL, TR>(
+    /// TODO
+    pub fn intersect_nesterov_accelerated<PL, PR, TL, TR>(
         &self,
         left: &PL,
         left_transform: &TL,
         right: &PR,
         right_transform: &TR,
-    ) -> Option<Simplex<P>>
+    ) -> Option<Simplex<Point3<S>>>
     where
-        P: EuclideanSpace<Scalar = S>,
-        PL: Primitive<Point = P>,
-        PR: Primitive<Point = P>,
-        SP: SimplexProcessor<Point = P>,
-        P::Diff: Neg<Output = P::Diff> + InnerSpace + Zero + Array<Element = S> + UlpsEq,
-        TL: Transform<P>,
-        TR: Transform<P>, 
+        PL: Primitive<Point = Point3<S>>,
+        PR: Primitive<Point = Point3<S>>,
+        TL: Transform<Point3<S>>,
+        TR: Transform<Point3<S>>, 
     {
-        let upper_bound = 1000000000;
-        let tolerance = 1e-6;
+        let upper_bound = S::from(1000000000).unwrap();
 
-        let use_nesterov_acceleration = true;
+        let mut use_nesterov_acceleration = true;
         let normalize_support_direction = false;
 
-        let inflation = 0;
+        let inflation = S::zero();
 
         let mut inside = false;
-        let mut distance = 0;
+        let mut distance = S::zero();
 
         let mut data = NesterovData::new(None, self.distance_tolerance);
 
@@ -71,7 +64,7 @@ where
 
             if use_nesterov_acceleration {
                 let momentum = S::from((k + 1.0) / (k + 3.0)).unwrap();
-                let y = (data.ray * momentum) + (data.support_point.v * (S::one() - momentum));
+                let y = data.ray * momentum + data.support_point.v * (S::one() - momentum);
                 data.ray_dir =  data.ray_dir * momentum + y * (S::one() - momentum);
 
                 if normalize_support_direction {
@@ -81,14 +74,65 @@ where
                 data.ray_dir = data.ray;
             }
 
+            data.support_point = SupportPoint::<Point3<S>>::from_minkowski(left, left_transform, right, right_transform, &data.ray_dir.neg());
+            data.simplex.push(data.support_point);
+
+            data.omega = data.ray_dir.dot(data.support_point.v) / data.ray_dir.magnitude();
+            if data.omega > upper_bound {
+                distance = data.omega - inflation;
+                inside = false;
+                break
+            }
+
+            if use_nesterov_acceleration {
+                let frank_wolfe_duality_gap = S::from(2.0).unwrap() * data.ray.dot(data.ray - data.support_point.v);
+                if frank_wolfe_duality_gap - self.distance_tolerance <= S::zero() {
+                    use_nesterov_acceleration = false;
+                    data.simplex.pop();
+                    continue
+                }
+            }
+
+            let cv_check_passed = self.check_convergence(&mut data);
+            if i > 0 && cv_check_passed {
+                data.simplex.pop();
+                if use_nesterov_acceleration{
+                    use_nesterov_acceleration = false;
+                    continue
+                }
+                distance = data.ray_len - inflation;
+
+                if distance < self.distance_tolerance{
+                    inside = true
+                }
+                break
+            }
+
+            match data.simplex.len() {
+                0 => { data.ray = data.support_point.v; }
+                1 => { inside = self.project_line_origen(&mut data) }
+                2 => { inside = self.project_triangle_origen(&mut data) }
+                3 => { inside = self.project_tetra_to_origen(&mut data) }
+                _ => {}
+            }
+
+            if !inside{
+                data.ray_len = data.ray.magnitude();
+            }
+
+            if inside || data.ray_len == S::zero() {
+                distance = -inflation;
+                inside = true;
+                break
+            }
         }
 
-        return None;
+        print!("{:?}", distance);
+
+        return if inside { Some(data.simplex) } else { None };
     }
 
-    fn check_convergence<P>(&self, data: &mut NesterovData<S, P>) -> bool 
-    where
-        P: EuclideanSpace<Scalar = S>
+    fn check_convergence(&self, data: &mut NesterovData<S>) -> bool 
     {
         data.alpha = data.alpha.max(data.omega);
 
@@ -97,27 +141,23 @@ where
         return (diff - self.distance_tolerance * data.ray_len) <= S::zero();
     }
 
-    fn origen_to_point<P>(
+    fn origen_to_point(
         &self, 
-        data: &mut NesterovData<S, P>, 
+        data: &mut NesterovData<S>, 
         a_index: usize, 
         a: Vector3<S>)
-    where
-        P: EuclideanSpace<Scalar = S>
     {
         data.ray = a;
         data.simplex[0] = data.simplex[a_index];
         data.simplex.truncate(1);
     }
 
-    fn origen_to_segment<P>(
+    fn origen_to_segment(
         &self, 
-        data: &mut NesterovData<S, P>, 
+        data: &mut NesterovData<S>, 
         a_index: usize, b_index: usize, 
         a: Vector3<S>, b: Vector3<S>, 
         ab: Vector3<S>, ab_dot_a0: S)
-    where
-        P: EuclideanSpace<Scalar = S>
     {
         data.ray = (a * ab.dot(b) + b * ab_dot_a0) / ab.magnitude2();
         data.simplex[0] = data.simplex[b_index];
@@ -125,13 +165,11 @@ where
         data.simplex.truncate(2);
     }
 
-    fn origen_to_triangle<P>(
+    fn origen_to_triangle(
         &self, 
-        data: &mut NesterovData<S, P>, 
+        data: &mut NesterovData<S>, 
         a_index: usize, b_index: usize, c_index: usize,
         abc: Vector3<S>, abc_dot_a0: S) -> bool
-    where
-        P: EuclideanSpace<Scalar = S>
     {
         if abc_dot_a0 == S::zero() {
             data.simplex[0] = data.simplex[c_index];
@@ -159,9 +197,7 @@ where
         return false;
     }
 
-    fn project_line_origen<P>(&self, data: &mut NesterovData<S, P>) -> bool
-    where
-        P: EuclideanSpace<Scalar = S, Diff = Vector3<S>>
+    fn project_line_origen(&self, data: &mut NesterovData<S>) -> bool
     {
         let a_index = 1;
         let b_index = 0;
@@ -192,9 +228,7 @@ where
         return false;
     }
 
-    fn project_triangle_origen<P>(&self, data: &mut NesterovData<S, P>) -> bool
-    where
-        P: EuclideanSpace<Scalar = S, Diff = Vector3<S>>
+    fn project_triangle_origen(&self, data: &mut NesterovData<S>) -> bool
     {
         let a_index = 2;
         let b_index = 1;
@@ -210,7 +244,7 @@ where
 
         let edge_ac2o = abc.cross(ac).dot(-a);
 
-        let t_b = || {
+        let t_b = |data: &mut NesterovData<S>| {
             let towards_b = ab.dot(-a);
             if towards_b < S::zero(){
                 self.origen_to_point(data, a_index, a);
@@ -226,13 +260,13 @@ where
                 self.origen_to_segment(data, a_index, b_index, a, b, ab, towards_c)
             }
             else{
-                t_b();
+                t_b(data);
             }
         }
         else {
             let edge_ab2o = ab.cross(abc).dot(-a);
             if edge_ab2o >= S::zero(){
-                t_b();
+                t_b(data);
             }
             else{
                 return self.origen_to_triangle(data, a_index, b_index, c_index, abc, abc.dot(-a))
@@ -242,9 +276,7 @@ where
         return false;
     }
 
-    fn project_tetra_to_origen<P>(&self, data: &mut NesterovData<S, P>) -> bool
-    where
-        P: EuclideanSpace<Scalar = S, Diff = Vector3<S>>
+    fn project_tetra_to_origen(&self, data: &mut NesterovData<S>) -> bool
     {
         let a_index = 3;
         let b_index = 2;
@@ -282,35 +314,36 @@ where
         let a_cross_b = a.cross(b);
         let a_cross_c = a.cross(c);
 
-        let region_inside = || {
+        let region_inside = |data: &mut NesterovData<S>| {
             data.ray = Vector3::zero();
+            true
         };
 
-        let region_abc = || {
+        let region_abc = |data: &mut NesterovData<S>| {
             self.origen_to_triangle(data, a_index, b_index, c_index, (b - a).cross(c - a), -c.dot(a_cross_b))
         };
 
-        let region_acd = || {
+        let region_acd = |data: &mut NesterovData<S>| {
             self.origen_to_triangle(data, a_index, c_index, d_index, (c - a).cross(d - a), -d.dot(a_cross_c))
         };
 
-        let region_adb = || {
+        let region_adb = |data: &mut NesterovData<S>| {
             self.origen_to_triangle(data, a_index, d_index, b_index, (d - a).cross(b - a), d.dot(a_cross_b))
         };
 
-        let region_ab = || {
+        let region_ab = |data: &mut NesterovData<S>| {
             self.origen_to_segment(data, a_index, b_index, a, b, b - a, -ba_aa)
         };
 
-        let region_ac = || {
+        let region_ac = |data: &mut NesterovData<S>| {
             self.origen_to_segment(data, a_index, c_index, a, c, c - a, -ca_aa)
         };
 
-        let region_ad = || {
+        let region_ad = |data: &mut NesterovData<S>| {
             self.origen_to_segment(data, a_index, d_index, a, d, d - a, -da_aa)
         };
 
-        let region_a = || {
+        let region_a = |data: &mut NesterovData<S>| {
             self.origen_to_point(data, a_index, a)
         };
 
@@ -319,40 +352,40 @@ where
                 if ba * da_ba + bd * ba_aa - bb * da_aa <= S::zero() {
                     if da_aa <= S::zero() {
                         if ba * ba_ca + bb * ca_aa - bc * ba_aa <= S::zero() {
-                            region_abc();
+                            region_abc(data);
                         } else {
-                            region_ab();
+                            region_ab(data);
                         }
                     } else {
                         if ba * ba_ca + bb * ca_aa - bc * ba_aa <= S::zero() {
                             if ca * ba_ca + cb * ca_aa - cc * ba_aa <= S::zero() {
                                 if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
-                                    region_acd();
+                                    region_acd(data);
                                 } else {
-                                    region_ac();
+                                    region_ac(data);
                                 }
                             } else {
-                                region_abc();
+                                region_abc(data);
                             }
                         } else {
-                            region_ab();
+                            region_ab(data);
                         }
                     }
                 } else {
                     if da * da_ba + dd * ba_aa - db * da_aa <= S::zero() {
-                        region_adb();
+                        region_adb(data);
                     } else {
                         if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
                             if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
-                                region_ad();
+                                region_ad(data);
                             } else {
-                                region_acd();
+                                region_acd(data);
                             }
                         } else {
                             if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
-                                region_ad();
+                                region_ad(data);
                             } else {
-                                region_ac();
+                                region_ac(data);
                             }
                         }
                     }
@@ -362,33 +395,33 @@ where
                     if ba * ba_ca + bb * ca_aa - bc * ba_aa <= S::zero() {
                         if ca * ba_ca + cb * ca_aa - cc * ba_aa <= S::zero() {
                             if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
-                                region_acd();
+                                region_acd(data);
                             } else {
-                                region_ac();
+                                region_ac(data);
                             }
                         } else {
-                            region_abc();
+                            region_abc(data);
                         }
                     } else {
-                        region_ad();
+                        region_ad(data);
                     }
                 } else {
                     if d.dot(a_cross_c) <= S::zero() {
                         if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
                             if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
-                                region_ad();
+                                region_ad(data);
                             } else {
-                                region_acd();
+                                region_acd(data);
                             }
                         } else {
                             if ca_aa <= S::zero() {
-                                region_ac();
+                                region_ac(data);
                             } else {
-                                region_ad();
+                                region_ad(data);
                             }
                         }
                     } else {
-                        region_inside();
+                        region_inside(data);
                     }
                 }
             }
@@ -399,51 +432,51 @@ where
                         if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
                             if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
                                 if da * da_ba + dd * ba_aa - db * da_aa <= S::zero() {
-                                    region_adb();
+                                    region_adb(data);
                                 } else {
-                                    region_ad();
+                                    region_ad(data);
                                 }
                             } else {
-                                region_acd();
+                                region_acd(data);
                             }
                         } else {
                             if ca * ba_ca + cb * ca_aa - cc * ba_aa <= S::zero() {
-                                region_ac();
+                                region_ac(data);
                             } else {
-                                region_abc();
+                                region_abc(data);
                             }
                         }
                     } else {
                         if ca * ba_ca + cb * ca_aa - cc * ba_aa <= S::zero() {
                             if ca * ca_da + cc * da_aa - cd * ca_aa <= S::zero() {
-                                region_acd();
+                                region_acd(data);
                             } else {
-                                region_ac();
+                                region_ac(data);
                             }
                         } else {
                             if c.dot(a_cross_b) <= S::zero() {
-                                region_abc();
+                                region_abc(data);
                             } else {
-                                region_acd();
+                                region_acd(data);
                             }
                         }
                     }
                 } else {
                     if c.dot(a_cross_b) <= S::zero() {
                         if ca * ba_ca + cb * ca_aa - cc * ba_aa <= S::zero() {
-                            region_ac();
+                            region_ac(data);
                         } else {
-                            region_abc();
+                            region_abc(data);
                         }
                     } else {
                         if -d.dot(a_cross_b) <= S::zero() {
                             if da * da_ba + dd * ba_aa - db * da_aa <= S::zero() {
-                                region_adb();
+                                region_adb(data);
                             } else {
-                                region_ad();
+                                region_ad(data);
                             }
                         } else {
-                            region_inside();
+                            return region_inside(data);
                         }
                     }
                 }
@@ -452,30 +485,30 @@ where
                     if -d.dot(a_cross_b) <= S::zero() {
                         if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
                             if da * da_ba + dd * ba_aa - db * da_aa <= S::zero() {
-                                region_adb();
+                                region_adb(data);
                             } else {
-                                region_ad();
+                                region_ad(data);
                             }
                         } else {
                             if d.dot(a_cross_c) <= S::zero() {
-                                region_acd();
+                                region_acd(data);
                             } else {
-                                region_adb();
+                                region_adb(data);
                             }
                         }
                     } else {
                         if d.dot(a_cross_c) <= S::zero() {
                             if da * ca_da + dc * da_aa - dd * ca_aa <= S::zero() {
-                                region_ad();
+                                region_ad(data);
                             } else {
-                                region_acd();
+                                region_acd(data);
                             }
                         } else {
-                            region_inside();
+                            region_inside(data);
                         }
                     }
                 } else {
-                    region_a();
+                    region_a(data);
                 } 
             }
         }
@@ -486,9 +519,8 @@ where
 }
 
 
-impl<S, P> NesterovData<S, P> 
+impl<S> NesterovData<S> 
 where 
-    P: EuclideanSpace<Scalar = S>,
     S: BaseFloat,
 {
     fn new(ray_guess: Option<Vector3<S>>, tolerance: S) -> Self 
