@@ -34,7 +34,7 @@ where
     }
 
     /// Create a random cylinder from height and radius range.
-    pub fn new_random<R>(rng: &impl Rng, height_range: R, radius_range: R) -> Self
+    pub fn new_random<R>(rng: &mut impl Rng, height_range: R, radius_range: R) -> Self
     where
     S: BaseFloat + SampleUniform,
     R: SampleRange<S>

@@ -25,10 +25,10 @@ impl<S> Sphere<S> {
     }
 
     /// Create a random Cuboid from radius range.
-    pub fn new_random<R>(rng: &impl Rng, radius_range: R) -> Self
+    pub fn new_random<R>(rng: &mut impl Rng, radius_range: R) -> Self
     where
     S: BaseFloat + SampleUniform,
-    R: SampleRange<S>
+    R: SampleRange<S> + Clone
     {
         Self{ 
             radius: rng.gen_range(radius_range) 

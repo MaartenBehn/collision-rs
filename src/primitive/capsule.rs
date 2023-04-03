@@ -34,7 +34,7 @@ where
     }
 
     /// Create a random capsule from heigth and radius ranges.
-    pub fn new_random<R>(rng: &impl Rng, height_range: R, radius_range: R) -> Self
+    pub fn new_random<R>(rng: &mut impl Rng, height_range: R, radius_range: R) -> Self
     where
     S: BaseFloat + SampleUniform,
     R: SampleRange<S>

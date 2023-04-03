@@ -27,7 +27,7 @@ impl<S> Circle<S> {
     }
 
     /// Create a random Circle from radius Range.
-    pub fn new_random<R>(rng: &impl Rng, radius_range: R) -> Self
+    pub fn new_random<R>(rng: &mut impl Rng, radius_range: R) -> Self
     where
     S: BaseFloat + SampleUniform,
     R: SampleRange<S>

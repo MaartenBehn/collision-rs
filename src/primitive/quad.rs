@@ -45,12 +45,12 @@ where
     }
 
     /// Create a random Cuboid from dimension range.
-    pub fn new_random<R>(rng: &impl Rng, dim_range: R) -> Self
+    pub fn new_random<R>(rng: &mut impl Rng, dim_range: R) -> Self
     where
     S: BaseFloat + SampleUniform,
-    R: SampleRange<S>
+    R: SampleRange<S> + Clone
     {
-        let dim_x = rng.gen_range(dim_range);
+        let dim_x = rng.gen_range(dim_range.to_owned());
         let dim_y = rng.gen_range(dim_range);
 
         Self::new(dim_x, dim_y)

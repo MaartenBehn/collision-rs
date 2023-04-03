@@ -127,7 +127,7 @@ where
             }
         }
 
-        print!("{:?}", distance);
+        println!("Distance: {:?}", distance);
 
         return if inside { Some(data.simplex) } else { None };
     }
@@ -174,7 +174,7 @@ where
         if abc_dot_a0 == S::zero() {
             data.simplex[0] = data.simplex[c_index];
             data.simplex[1] = data.simplex[b_index];
-            data.simplex[3] = data.simplex[a_index];
+            data.simplex[2] = data.simplex[a_index];
             data.simplex.truncate(3);
 
             data.ray = Vector3::from_value(S::zero());
@@ -190,7 +190,7 @@ where
             data.simplex[1] = data.simplex[c_index];
         }
 
-        data.simplex[3] = data.simplex[a_index];
+        data.simplex[2] = data.simplex[a_index];
         data.simplex.truncate(3);
 
         data.ray = abc * -abc_dot_a0 / abc.magnitude2();
@@ -553,8 +553,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{Decomposed, Quaternion, Rad, Rotation3, Vector3};
-    use crate::{primitive::{Cuboid, Sphere}, algorithm::minkowski::GJK3};
+    use cgmath::{Decomposed, Quaternion, Rad, Rotation3, Vector3, BaseFloat};
+    use rand::{Rng, distributions::uniform::{SampleUniform, SampleRange}, rngs::StdRng, SeedableRng};
+    use crate::{primitive::{Cuboid, Sphere, Primitive3}, algorithm::minkowski::GJK3};
     
     fn transform_3d(
         x: f32,
@@ -583,18 +584,54 @@ mod tests {
         let shape = Sphere::new(1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let p = gjk.intersect(&shape, &t, &shape, &t);
+        let p = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
+    }
+
+
+    fn random_transform<S, R>(rng: &mut impl Rng, pos_range: R, angle_range: R) -> Decomposed<Vector3<S>, Quaternion<S>> 
+    where
+        S: BaseFloat + SampleUniform,
+        R: SampleRange<S> + Clone
+    {
+        Decomposed {
+            disp: Vector3::<S>::new(
+                rng.gen_range(pos_range.to_owned()), 
+                rng.gen_range(pos_range.to_owned()), 
+                rng.gen_range(pos_range.to_owned())),
+            rot: Quaternion::from_angle_z(Rad(rng.gen_range(angle_range))),
+            scale: S::one(),
+        }
     }
 
     #[test]
     fn test_nesterov_accelerated_vs_original(){
         let iterations = 10000;
 
+        let mut rng = StdRng::seed_from_u64(42);
+        let size_range = 0.0 .. 100.0;
+        let pos_range = 0.0 .. 500.0;
+        let angle_range = 0.0 .. 360.0;
+
+        let gjk = GJK3::new();
+
         for i in 0..iterations {
+            println!("Interation: {:?}", i);
 
-            let shape_0 = 
+            let transform_0 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+            let transform_1 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
 
+            let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
+            let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
+
+            if i == 525{
+                print!("Debug")
+            }
+
+            let p = gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
+            let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
+            
+            assert!((p.is_some() == test_p.is_some()));
         }
     }
 }
