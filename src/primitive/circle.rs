@@ -2,6 +2,8 @@
 
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point2, Vector2};
+use rand::Rng;
+use rand::distributions::uniform::{SampleUniform, SampleRange};
 
 use crate::prelude::*;
 use crate::{Aabb2, Ray2};
@@ -22,6 +24,17 @@ impl<S> Circle<S> {
     /// Create a new circle primitive
     pub fn new(radius: S) -> Self {
         Self { radius }
+    }
+
+    /// Create a random Circle from radius Range.
+    pub fn new_random<R>(rng: &impl Rng, radius_range: R) -> Self
+    where
+    S: BaseFloat + SampleUniform,
+    R: SampleRange<S>
+    {
+        Self{
+            radius: rng.gen_range(radius_range),
+        }
     }
 }
 

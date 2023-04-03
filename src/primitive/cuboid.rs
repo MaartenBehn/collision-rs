@@ -1,5 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use rand::Rng;
+use rand::distributions::uniform::{SampleRange, SampleUniform};
 
 use crate::prelude::*;
 use crate::primitive::util::get_max_point;
@@ -39,6 +41,19 @@ where
             half_dim,
             corners: Self::generate_corners(&half_dim),
         }
+    }
+
+    /// Create a random Cuboid from dimension range.
+    pub fn new_random<R>(rng: &impl Rng, dim_range: R) -> Self
+    where
+    S: BaseFloat + SampleUniform,
+    R: SampleRange<S>
+    {
+        let dim_x = rng.gen_range(dim_range);
+        let dim_y = rng.gen_range(dim_range);
+        let dim_z = rng.gen_range(dim_range);
+
+        Self::new(dim_x, dim_y, dim_z)
     }
 
     /// Get the dimensions of the `Cuboid`
@@ -154,6 +169,16 @@ where
         Cube {
             cuboid: Cuboid::new(dim, dim, dim),
         }
+    }
+
+    /// Create a random Cuboid from dimension range.
+    pub fn new_random<R>(rng: &impl Rng, dim_range: R) -> Self
+    where
+    S: BaseFloat + SampleUniform,
+    R: SampleRange<S>
+    {
+        let dim = rng.gen_range(dim_range);
+        Self::new(dim)
     }
 
     /// Get the dimension of the cube

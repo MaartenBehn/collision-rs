@@ -1,5 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use rand::Rng;
+use rand::distributions::uniform::{SampleUniform, SampleRange};
 
 use crate::prelude::*;
 use crate::primitive::util::cylinder_ray_quadratic_solve;
@@ -25,6 +27,21 @@ where
 {
     /// Create a new cylinder
     pub fn new(half_height: S, radius: S) -> Self {
+        Self {
+            half_height,
+            radius,
+        }
+    }
+
+    /// Create a random cylinder from height and radius range.
+    pub fn new_random<R>(rng: &impl Rng, height_range: R, radius_range: R) -> Self
+    where
+    S: BaseFloat + SampleUniform,
+    R: SampleRange<S>
+    {
+        let half_height = rng.gen_range(height_range) / S::from(2).unwrap();
+        let radius = rng.gen_range(radius_range);
+
         Self {
             half_height,
             radius,

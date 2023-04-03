@@ -2,6 +2,8 @@
 
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use rand::Rng;
+use rand::distributions::uniform::{SampleUniform, SampleRange};
 
 use crate::prelude::*;
 use crate::primitive::{
@@ -222,6 +224,26 @@ where
             Primitive3::ConvexPolyhedron(ref polyhedron) => {
                 polyhedron.intersection_transformed(ray, transform)
             }
+        }
+    }
+}
+
+impl<S> Primitive3<S>
+where
+    S: BaseFloat
+{
+    fn new_random<R>(rng: &impl Rng, size_range: R) -> Primitive3<S>
+    where
+        S: BaseFloat + SampleUniform,
+        R: SampleRange<S>
+    {
+        match rng.gen_range(0..=5) { // rand 0.8
+            0 => Primitive3::Capsule(Capsule::new_random(rng, size_range, size_range)),
+            1 => Primitive3::Cylinder(Cylinder::new_random(rng, size_range, size_range)),
+            2 => Primitive3::Quad(Quad::new_random(rng, size_range)),
+            3 => Primitive3::Cuboid(Cuboid::new_random(rng, size_range)),
+            4 => Primitive3::Cube(Cube::new_random(rng, size_range)),
+            _ => Primitive3::Sphere(Sphere::new_random(rng, size_range)),
         }
     }
 }

@@ -109,10 +109,10 @@ where
             }
 
             match data.simplex.len() {
-                0 => { data.ray = data.support_point.v; }
-                1 => { inside = self.project_line_origen(&mut data) }
-                2 => { inside = self.project_triangle_origen(&mut data) }
-                3 => { inside = self.project_tetra_to_origen(&mut data) }
+                1 => { data.ray = data.support_point.v; }
+                2 => { inside = self.project_line_origen(&mut data) }
+                3 => { inside = self.project_triangle_origen(&mut data) }
+                4 => { inside = self.project_tetra_to_origen(&mut data) }
                 _ => {}
             }
 
@@ -549,3 +549,52 @@ where
     }
 }
 
+
+
+#[cfg(test)]
+mod tests {
+    use cgmath::{Decomposed, Quaternion, Rad, Rotation3, Vector3};
+    use crate::{primitive::{Cuboid, Sphere}, algorithm::minkowski::GJK3};
+    
+    fn transform_3d(
+        x: f32,
+        y: f32,
+        z: f32,
+        angle_z: f32,
+    ) -> Decomposed<Vector3<f32>, Quaternion<f32>> {
+        Decomposed {
+            disp: Vector3::new(x, y, z),
+            rot: Quaternion::from_angle_z(Rad(angle_z)),
+            scale: 1.,
+        }
+    }
+
+    #[test]
+    fn test_gjk_nesterov_accelerated_exact_3d() {
+        let shape = Cuboid::new(1., 1., 1.);
+        let t = transform_3d(0., 0., 0., 0.);
+        let gjk = GJK3::new();
+        let p = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        assert!(p.is_some());
+    }
+
+    #[test]
+    fn test_gjk_nesterov_accelerated_sphere() {
+        let shape = Sphere::new(1.);
+        let t = transform_3d(0., 0., 0., 0.);
+        let gjk = GJK3::new();
+        let p = gjk.intersect(&shape, &t, &shape, &t);
+        assert!(p.is_some());
+    }
+
+    #[test]
+    fn test_nesterov_accelerated_vs_original(){
+        let iterations = 10000;
+
+        for i in 0..iterations {
+
+            let shape_0 = 
+
+        }
+    }
+}
