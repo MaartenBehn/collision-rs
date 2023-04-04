@@ -1,7 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
-use rand::distributions::uniform::{SampleUniform, SampleRange};
 
 use crate::prelude::*;
 use crate::{Aabb3, Ray3};
@@ -27,12 +27,12 @@ impl<S> Sphere<S> {
     /// Create a random Cuboid from radius range.
     pub fn new_random<R>(rng: &mut impl Rng, radius_range: R) -> Self
     where
-    S: BaseFloat + SampleUniform,
-    R: SampleRange<S> + Clone
+        S: BaseFloat + SampleUniform,
+        R: SampleRange<S> + Clone,
     {
-        Self{ 
-            radius: rng.gen_range(radius_range) 
-        } 
+        Self {
+            radius: rng.gen_range(radius_range),
+        }
     }
 }
 

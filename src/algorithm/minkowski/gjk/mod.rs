@@ -17,8 +17,8 @@ use crate::prelude::*;
 use crate::{CollisionStrategy, Contact};
 use cgmath::ulps_eq;
 
-mod simplex;
 mod nesterov_accelerated;
+mod simplex;
 
 const MAX_ITERATIONS: u32 = 100;
 const GJK_DISTANCE_TOLERANCE: f32 = 0.000_001;

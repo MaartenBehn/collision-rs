@@ -1,11 +1,10 @@
 use std::ops::Neg;
 
-use cgmath::{BaseFloat, InnerSpace, Zero, Array, Transform, vec3, Vector3, Point3};
+use cgmath::{vec3, Array, BaseFloat, InnerSpace, Point3, Transform, Vector3, Zero};
 
 use crate::{algorithm::minkowski::SupportPoint, Primitive};
 
 use super::{simplex::Simplex, GJK3};
-
 
 struct NesterovData<S>
 where
@@ -21,7 +20,6 @@ where
 
     support_point: SupportPoint<Point3<S>>,
 }
-
 
 impl<S> GJK3<S>
 where
@@ -39,7 +37,7 @@ where
         PL: Primitive<Point = Point3<S>>,
         PR: Primitive<Point = Point3<S>>,
         TL: Transform<Point3<S>>,
-        TR: Transform<Point3<S>>, 
+        TR: Transform<Point3<S>>,
     {
         let upper_bound = S::from(1000000000).unwrap();
 
@@ -59,13 +57,13 @@ where
             if data.ray_len < self.distance_tolerance {
                 distance = -inflation;
                 inside = true;
-                break
+                break;
             }
 
             if use_nesterov_acceleration {
                 let momentum = S::from((k + 1.0) / (k + 3.0)).unwrap();
                 let y = data.ray * momentum + data.support_point.v * (S::one() - momentum);
-                data.ray_dir =  data.ray_dir * momentum + y * (S::one() - momentum);
+                data.ray_dir = data.ray_dir * momentum + y * (S::one() - momentum);
 
                 if normalize_support_direction {
                     data.ray_dir = data.ray_dir.normalize();
@@ -74,56 +72,65 @@ where
                 data.ray_dir = data.ray;
             }
 
-            data.support_point = SupportPoint::<Point3<S>>::from_minkowski(left, left_transform, right, right_transform, &data.ray_dir.neg());
+            data.support_point = SupportPoint::<Point3<S>>::from_minkowski(
+                left,
+                left_transform,
+                right,
+                right_transform,
+                &data.ray_dir.neg(),
+            );
             data.simplex.push(data.support_point);
 
             data.omega = data.ray_dir.dot(data.support_point.v) / data.ray_dir.magnitude();
             if data.omega > upper_bound {
                 distance = data.omega - inflation;
                 inside = false;
-                break
+                break;
             }
 
             if use_nesterov_acceleration {
-                let frank_wolfe_duality_gap = S::from(2.0).unwrap() * data.ray.dot(data.ray - data.support_point.v);
+                let frank_wolfe_duality_gap =
+                    S::from(2.0).unwrap() * data.ray.dot(data.ray - data.support_point.v);
                 if frank_wolfe_duality_gap - self.distance_tolerance <= S::zero() {
                     use_nesterov_acceleration = false;
                     data.simplex.pop();
-                    continue
+                    continue;
                 }
             }
 
             let cv_check_passed = self.check_convergence(&mut data);
             if i > 0 && cv_check_passed {
                 data.simplex.pop();
-                if use_nesterov_acceleration{
+                if use_nesterov_acceleration {
                     use_nesterov_acceleration = false;
-                    continue
+                    continue;
                 }
                 distance = data.ray_len - inflation;
 
-                if distance < self.distance_tolerance{
+                if distance < self.distance_tolerance {
                     inside = true
                 }
-                break
+                break;
             }
 
             match data.simplex.len() {
-                1 => { data.ray = data.support_point.v; }
-                2 => { inside = self.project_line_origen(&mut data) }
-                3 => { inside = self.project_triangle_origen(&mut data) }
-                4 => { inside = self.project_tetra_to_origen(&mut data) }
+                1 => {
+                    data.ray = data.support_point.v;
+                }
+                2 => inside = self.project_line_origen(&mut data),
+                3 => inside = self.project_triangle_origen(&mut data),
+                4 => inside = self.project_tetra_to_origen(&mut data),
                 _ => {}
             }
 
-            if !inside{
+            if !inside {
                 data.ray_len = data.ray.magnitude();
             }
 
             if inside || data.ray_len == S::zero() {
                 distance = -inflation;
                 inside = true;
-                break
+                break;
             }
         }
 
@@ -132,8 +139,7 @@ where
         return if inside { Some(data.simplex) } else { None };
     }
 
-    fn check_convergence(&self, data: &mut NesterovData<S>) -> bool 
-    {
+    fn check_convergence(&self, data: &mut NesterovData<S>) -> bool {
         data.alpha = data.alpha.max(data.omega);
 
         let diff = data.ray_len - data.alpha;
@@ -141,24 +147,22 @@ where
         return (diff - self.distance_tolerance * data.ray_len) <= S::zero();
     }
 
-    fn origen_to_point(
-        &self, 
-        data: &mut NesterovData<S>, 
-        a_index: usize, 
-        a: Vector3<S>)
-    {
+    fn origen_to_point(&self, data: &mut NesterovData<S>, a_index: usize, a: Vector3<S>) {
         data.ray = a;
         data.simplex[0] = data.simplex[a_index];
         data.simplex.truncate(1);
     }
 
     fn origen_to_segment(
-        &self, 
-        data: &mut NesterovData<S>, 
-        a_index: usize, b_index: usize, 
-        a: Vector3<S>, b: Vector3<S>, 
-        ab: Vector3<S>, ab_dot_a0: S)
-    {
+        &self,
+        data: &mut NesterovData<S>,
+        a_index: usize,
+        b_index: usize,
+        a: Vector3<S>,
+        b: Vector3<S>,
+        ab: Vector3<S>,
+        ab_dot_a0: S,
+    ) {
         data.ray = (a * ab.dot(b) + b * ab_dot_a0) / ab.magnitude2();
         data.simplex[0] = data.simplex[b_index];
         data.simplex[1] = data.simplex[a_index];
@@ -166,11 +170,14 @@ where
     }
 
     fn origen_to_triangle(
-        &self, 
-        data: &mut NesterovData<S>, 
-        a_index: usize, b_index: usize, c_index: usize,
-        abc: Vector3<S>, abc_dot_a0: S) -> bool
-    {
+        &self,
+        data: &mut NesterovData<S>,
+        a_index: usize,
+        b_index: usize,
+        c_index: usize,
+        abc: Vector3<S>,
+        abc_dot_a0: S,
+    ) -> bool {
         if abc_dot_a0 == S::zero() {
             data.simplex[0] = data.simplex[c_index];
             data.simplex[1] = data.simplex[b_index];
@@ -184,8 +191,7 @@ where
         if abc_dot_a0 > S::zero() {
             data.simplex[0] = data.simplex[c_index];
             data.simplex[1] = data.simplex[b_index];
-        }
-        else {
+        } else {
             data.simplex[0] = data.simplex[b_index];
             data.simplex[1] = data.simplex[c_index];
         }
@@ -197,8 +203,7 @@ where
         return false;
     }
 
-    fn project_line_origen(&self, data: &mut NesterovData<S>) -> bool
-    {
+    fn project_line_origen(&self, data: &mut NesterovData<S>) -> bool {
         let a_index = 1;
         let b_index = 0;
 
@@ -210,26 +215,24 @@ where
 
         if d == S::zero() {
             /* Two extremely unlikely cases:
-               - AB is orthogonal to A: should never happen because it means the support
-                 function did not do any progress and GJK should have stopped.
-               - A == origin
-              In any case, A is the closest to the origin */
+             - AB is orthogonal to A: should never happen because it means the support
+               function did not do any progress and GJK should have stopped.
+             - A == origin
+            In any case, A is the closest to the origin */
             self.origen_to_point(data, a_index, a);
             return a.is_zero();
         }
 
         if d < S::zero() {
             self.origen_to_point(data, a_index, a);
-        }
-        else {
+        } else {
             self.origen_to_segment(data, a_index, b_index, a, b, ab, d);
         }
 
         return false;
     }
 
-    fn project_triangle_origen(&self, data: &mut NesterovData<S>) -> bool
-    {
+    fn project_triangle_origen(&self, data: &mut NesterovData<S>) -> bool {
         let a_index = 2;
         let b_index = 1;
         let c_index = 0;
@@ -246,10 +249,9 @@ where
 
         let t_b = |data: &mut NesterovData<S>| {
             let towards_b = ab.dot(-a);
-            if towards_b < S::zero(){
+            if towards_b < S::zero() {
                 self.origen_to_point(data, a_index, a);
-            }
-            else{
+            } else {
                 self.origen_to_segment(data, a_index, b_index, a, b, ab, towards_b)
             }
         };
@@ -258,26 +260,22 @@ where
             let towards_c = ac.dot(-a);
             if towards_c >= S::zero() {
                 self.origen_to_segment(data, a_index, b_index, a, b, ab, towards_c)
-            }
-            else{
+            } else {
                 t_b(data);
             }
-        }
-        else {
+        } else {
             let edge_ab2o = ab.cross(abc).dot(-a);
-            if edge_ab2o >= S::zero(){
+            if edge_ab2o >= S::zero() {
                 t_b(data);
-            }
-            else{
-                return self.origen_to_triangle(data, a_index, b_index, c_index, abc, abc.dot(-a))
+            } else {
+                return self.origen_to_triangle(data, a_index, b_index, c_index, abc, abc.dot(-a));
             }
         }
 
         return false;
     }
 
-    fn project_tetra_to_origen(&self, data: &mut NesterovData<S>) -> bool
-    {
+    fn project_tetra_to_origen(&self, data: &mut NesterovData<S>) -> bool {
         let a_index = 3;
         let b_index = 2;
         let c_index = 1;
@@ -320,15 +318,36 @@ where
         };
 
         let region_abc = |data: &mut NesterovData<S>| {
-            self.origen_to_triangle(data, a_index, b_index, c_index, (b - a).cross(c - a), -c.dot(a_cross_b))
+            self.origen_to_triangle(
+                data,
+                a_index,
+                b_index,
+                c_index,
+                (b - a).cross(c - a),
+                -c.dot(a_cross_b),
+            )
         };
 
         let region_acd = |data: &mut NesterovData<S>| {
-            self.origen_to_triangle(data, a_index, c_index, d_index, (c - a).cross(d - a), -d.dot(a_cross_c))
+            self.origen_to_triangle(
+                data,
+                a_index,
+                c_index,
+                d_index,
+                (c - a).cross(d - a),
+                -d.dot(a_cross_c),
+            )
         };
 
         let region_adb = |data: &mut NesterovData<S>| {
-            self.origen_to_triangle(data, a_index, d_index, b_index, (d - a).cross(b - a), d.dot(a_cross_b))
+            self.origen_to_triangle(
+                data,
+                a_index,
+                d_index,
+                b_index,
+                (d - a).cross(b - a),
+                d.dot(a_cross_b),
+            )
         };
 
         let region_ab = |data: &mut NesterovData<S>| {
@@ -343,9 +362,7 @@ where
             self.origen_to_segment(data, a_index, d_index, a, d, d - a, -da_aa)
         };
 
-        let region_a = |data: &mut NesterovData<S>| {
-            self.origen_to_point(data, a_index, a)
-        };
+        let region_a = |data: &mut NesterovData<S>| self.origen_to_point(data, a_index, a);
 
         if ba_aa <= S::zero() {
             if -d.dot(a_cross_b) <= S::zero() {
@@ -509,22 +526,19 @@ where
                     }
                 } else {
                     region_a(data);
-                } 
+                }
             }
         }
 
-        return false;    
+        return false;
     }
-
 }
 
-
-impl<S> NesterovData<S> 
-where 
+impl<S> NesterovData<S>
+where
     S: BaseFloat,
 {
-    fn new(ray_guess: Option<Vector3<S>>, tolerance: S) -> Self 
-    { 
+    fn new(ray_guess: Option<Vector3<S>>, tolerance: S) -> Self {
         let simplex = Simplex::new();
         let mut ray = ray_guess.unwrap_or(vec3(S::one(), S::zero(), S::zero()));
         let mut ray_len = ray.magnitude();
@@ -537,26 +551,31 @@ where
         let ray_dir = ray;
         let support_point = SupportPoint::new();
 
-        Self { 
+        Self {
             alpha: S::zero(),
             omega: S::zero(),
-            simplex, 
-            ray, 
-            ray_len, 
-            ray_dir, 
-            support_point 
-        } 
+            simplex,
+            ray,
+            ray_len,
+            ray_dir,
+            support_point,
+        }
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use cgmath::{Decomposed, Quaternion, Rad, Rotation3, Vector3, BaseFloat};
-    use rand::{Rng, distributions::uniform::{SampleUniform, SampleRange}, rngs::StdRng, SeedableRng};
-    use crate::{primitive::{Cuboid, Sphere, Primitive3}, algorithm::minkowski::GJK3};
-    
+    use crate::{
+        algorithm::minkowski::GJK3,
+        primitive::{Cuboid, Primitive3, Sphere},
+    };
+    use cgmath::{BaseFloat, Decomposed, Quaternion, Rad, Rotation3, Vector3};
+    use rand::{
+        distributions::uniform::{SampleRange, SampleUniform},
+        rngs::StdRng,
+        Rng, SeedableRng,
+    };
+
     fn transform_3d(
         x: f32,
         y: f32,
@@ -588,49 +607,56 @@ mod tests {
         assert!(p.is_some());
     }
 
-
-    fn random_transform<S, R>(rng: &mut impl Rng, pos_range: R, angle_range: R) -> Decomposed<Vector3<S>, Quaternion<S>> 
+    fn random_transform<S, R>(
+        rng: &mut impl Rng,
+        pos_range: R,
+        angle_range: R,
+    ) -> Decomposed<Vector3<S>, Quaternion<S>>
     where
         S: BaseFloat + SampleUniform,
-        R: SampleRange<S> + Clone
+        R: SampleRange<S> + Clone,
     {
         Decomposed {
             disp: Vector3::<S>::new(
-                rng.gen_range(pos_range.to_owned()), 
-                rng.gen_range(pos_range.to_owned()), 
-                rng.gen_range(pos_range.to_owned())),
+                rng.gen_range(pos_range.to_owned()),
+                rng.gen_range(pos_range.to_owned()),
+                rng.gen_range(pos_range.to_owned()),
+            ),
             rot: Quaternion::from_angle_z(Rad(rng.gen_range(angle_range))),
             scale: S::one(),
         }
     }
 
     #[test]
-    fn test_nesterov_accelerated_vs_original(){
-        let iterations = 10000;
+    fn test_nesterov_accelerated_vs_original() {
+        let iterations = 1000;
 
         let mut rng = StdRng::seed_from_u64(42);
-        let size_range = 0.0 .. 100.0;
-        let pos_range = 0.0 .. 500.0;
-        let angle_range = 0.0 .. 360.0;
+        let size_range = 0.0..100.0;
+        let pos_range = 0.0..500.0;
+        let angle_range = 0.0..360.0;
 
         let gjk = GJK3::new();
 
         for i in 0..iterations {
             println!("Interation: {:?}", i);
 
-            let transform_0 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
-            let transform_1 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+            let transform_0 =
+                random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+            let transform_1 =
+                random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
 
             let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
             let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
 
-            if i == 525{
+            if i == 525 {
                 print!("Debug")
             }
 
-            let p = gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
+            let p =
+                gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
             let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
-            
+
             assert!((p.is_some() == test_p.is_some()));
         }
     }

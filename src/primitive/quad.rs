@@ -2,8 +2,8 @@
 
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector2, Vector3};
-use rand::Rng;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
+use rand::Rng;
 
 use crate::prelude::*;
 use crate::primitive::util::get_max_point;
@@ -47,8 +47,8 @@ where
     /// Create a random Cuboid from dimension range.
     pub fn new_random<R>(rng: &mut impl Rng, dim_range: R) -> Self
     where
-    S: BaseFloat + SampleUniform,
-    R: SampleRange<S> + Clone
+        S: BaseFloat + SampleUniform,
+        R: SampleRange<S> + Clone,
     {
         let dim_x = rng.gen_range(dim_range.to_owned());
         let dim_y = rng.gen_range(dim_range);

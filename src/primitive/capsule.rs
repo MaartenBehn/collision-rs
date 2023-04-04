@@ -1,7 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
-use rand::Rng;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
+use rand::Rng;
 
 use crate::prelude::*;
 use crate::primitive::util::cylinder_ray_quadratic_solve;
@@ -36,8 +36,8 @@ where
     /// Create a random capsule from heigth and radius ranges.
     pub fn new_random<R>(rng: &mut impl Rng, height_range: R, radius_range: R) -> Self
     where
-    S: BaseFloat + SampleUniform,
-    R: SampleRange<S>
+        S: BaseFloat + SampleUniform,
+        R: SampleRange<S>,
     {
         let half_height = rng.gen_range(height_range) / S::from(2).unwrap();
         let radius = rng.gen_range(radius_range);

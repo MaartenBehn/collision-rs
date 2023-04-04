@@ -15,7 +15,8 @@ authors = ["Brendan Zabarauskas <bjzaba@yahoo.com.au>",
         "Pierre Krieger",
         "Tomasz Stachowiak",
         "Zeke Foppa",
-        "Thomas O'Dell"
+        "Thomas O'Dell",
+        "Maarten Behn"
 ]
 license = "Apache-2.0"
 description = "A collision extension to cgmath"
