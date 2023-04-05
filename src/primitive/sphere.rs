@@ -1,5 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use json::JsonValue;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
 
@@ -24,7 +25,7 @@ impl<S> Sphere<S> {
         Self { radius }
     }
 
-    /// Create a random Cuboid from radius range.
+    /// Create a random sphere from radius range.
     pub fn new_random<R>(rng: &mut impl Rng, radius_range: R) -> Self
     where
         S: BaseFloat + SampleUniform,
@@ -33,6 +34,21 @@ impl<S> Sphere<S> {
         Self {
             radius: rng.gen_range(radius_range),
         }
+    }
+
+    /// Create a random sphere from json.
+    pub fn from_json(json_data: JsonValue) -> (Sphere<f32>, [f32; 3])
+    {
+        assert!(json_data["type"] == "Sphere");
+        
+        let center = [
+            json_data["center"][0].as_f32().unwrap(), 
+            json_data["center"][1].as_f32().unwrap(), 
+            json_data["center"][2].as_f32().unwrap()];
+
+        let radius = json_data["radius"].as_f32().unwrap();
+
+        (Sphere::new(radius), center)
     }
 }
 

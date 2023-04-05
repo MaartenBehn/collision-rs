@@ -565,11 +565,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use crate::{
         algorithm::minkowski::GJK3,
-        primitive::{Cuboid, Primitive3, Sphere},
+        primitive::{Cuboid, Primitive3, Sphere, Cylinder, Capsule},
     };
     use cgmath::{BaseFloat, Decomposed, Quaternion, Rad, Rotation3, Vector3};
+    use json::JsonValue;
     use rand::{
         distributions::uniform::{SampleRange, SampleUniform},
         rngs::StdRng,
@@ -652,12 +655,65 @@ mod tests {
             if i == 525 {
                 print!("Debug")
             }
-
+            
             let p =
                 gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
             let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
 
             assert!((p.is_some() == test_p.is_some()));
+        }
+    }
+
+    fn parse_collider(json_obj: &JsonValue) -> (Primitive3<f32>, [f32; 3]) {
+        if json_obj["type"] == "Cylinder" {
+            let (cylinder, center) = Cylinder::<f32>::from_json(json_obj.to_owned());
+            return (Primitive3::Cylinder(cylinder), center);
+        }
+        else if json_obj["type"] == "Capsule" {
+            let (capsule, center) = Capsule::<f32>::from_json(json_obj.to_owned());
+            return (Primitive3::Capsule(capsule), center);
+        }
+        else if json_obj["type"] == "Sphere" {
+            let (sphere, center) = Sphere::<f32>::from_json(json_obj.to_owned());
+            return (Primitive3::Sphere(sphere), center);
+        }
+        else {
+            panic!("Invalid type");
+        }
+    }
+
+    #[test]
+    fn test_file() {
+        let path = "../data/test_data.json";
+        let contents = fs::read_to_string(path).unwrap();
+
+        let json_data = json::parse(&contents).unwrap();
+
+        let gjk = GJK3::new();
+
+        let mut i = 0;
+        for json_obj in json_data.members(){
+            println!("Interation: {:?}", i);
+
+            let collider1 = &json_obj["collider1"];
+            let collider2 = &json_obj["collider2"];
+            let distance = json_obj["distance"].as_f32().unwrap();
+
+            let (shape0, center0) = parse_collider(collider1);
+            let (shape1, center1) = parse_collider(collider2);
+
+            let t0 = transform_3d(center0[0], center0[1], center0[2], 0.);
+            let t1 = transform_3d(center1[0], center1[1], center1[2], 0.);
+            
+            if i == 97 {
+                println!("Debug");
+            }
+
+            let p = gjk.intersect_nesterov_accelerated(&shape0, &t0, &shape1, &t1);
+
+            assert!(p.is_some() == (distance == 0.0));
+
+            i += 1;
         }
     }
 }
