@@ -1,6 +1,6 @@
 use std::ops::Neg;
 
-use cgmath::{vec3, Array, BaseFloat, InnerSpace, Point3, Transform, Vector3, Zero};
+use cgmath::{vec3, Array, BaseFloat, InnerSpace, Point3, Transform, Vector3, Zero, point3};
 
 use crate::{algorithm::minkowski::SupportPoint, Primitive};
 
@@ -200,6 +200,10 @@ where
         data.simplex.truncate(3);
 
         data.ray = abc * -abc_dot_a0 / abc.magnitude2();
+        if abc == Vector3::zero() {
+            data.ray = abc;
+        }
+
         return false;
     }
 
@@ -438,7 +442,7 @@ where
                             }
                         }
                     } else {
-                        region_inside(data);
+                        return region_inside(data);
                     }
                 }
             }
@@ -521,7 +525,7 @@ where
                                 region_acd(data);
                             }
                         } else {
-                            region_inside(data);
+                            return region_inside(data);
                         }
                     }
                 } else {
@@ -549,7 +553,11 @@ where
         }
 
         let ray_dir = ray;
-        let support_point = SupportPoint::new();
+        let support_point = SupportPoint{
+            v: ray,
+            sup_a: point3(ray.x, ray.y, ray.z),
+            sup_b: point3(ray.x, ray.y, ray.z)
+        };
 
         Self {
             alpha: S::zero(),
