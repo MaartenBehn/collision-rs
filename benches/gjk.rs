@@ -1,43 +1,7 @@
-#![feature(test)]
-
-extern crate test;
-
-use cgmath::{Decomposed, Vector3, Quaternion, BaseFloat, Rotation3, Rad};
-use rand::distributions::uniform::{SampleUniform, SampleRange};
-use rand::{prelude::StdRng, Rng};
-use rand::SeedableRng;
-use collision::algorithm::minkowski::GJK3;
-use collision::primitive::Primitive3;
-use test::{Bencher};
-
-#[bench]
-fn test_gjk_original(bench: &mut Bencher) { test_gjk(bench, false); }
-
-#[bench]
-fn test_gjk_nasterov(bench: &mut Bencher) { test_gjk(bench, true); }
-
-fn test_gjk(bench: &mut Bencher, use_nasterov: bool) {
-    let mut rng = StdRng::seed_from_u64(42);
-    let size_range = 0.0..100.0;
-    let pos_range = 0.0..500.0;
-    let angle_range = 0.0..360.0;
-
-    let gjk = GJK3::new();
-
-    bench.iter(|| {
-        let transform_0 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
-        let transform_1 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
-
-        let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
-        let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
-
-        if use_nasterov {
-            gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
-        } else {
-            gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
-        }
-    });
-}
+use cgmath::{Quaternion, Vector3, Decomposed, BaseFloat, Rotation3, Rad};
+use collision::{algorithm::minkowski::GJK3, primitive::Primitive3};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use rand::{rngs::StdRng, Rng, distributions::uniform::{SampleUniform, SampleRange}, SeedableRng};
 
 fn random_transform<S, R>(
     rng: &mut impl Rng,
@@ -58,5 +22,61 @@ where
         scale: S::one(),
     }
 }
+
+fn original_benchmark(c: &mut Criterion) {
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let size_range = 0.0..100.0;
+    let pos_range = 0.0..500.0;
+    let angle_range = 0.0..360.0;
+
+    let gjk = GJK3::new();
+
+    let mut group = c.benchmark_group("original_gjk");
+
+    for i in 0..10 {
+        let transform_0 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+        let transform_1 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+
+        let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
+        let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
+
+
+        group.bench_function(BenchmarkId::from_parameter(i), |b| b.iter(|| 
+            gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1)
+        ));
+    }
+    group.finish();
+}
+
+
+fn nasterov_benchmark(c: &mut Criterion) {
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let size_range = 0.0..100.0;
+    let pos_range = 0.0..500.0;
+    let angle_range = 0.0..360.0;
+
+    let gjk = GJK3::new();
+
+    let mut group = c.benchmark_group("nasterov_gjk");
+
+    for i in 0..10 {
+        let transform_0 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+        let transform_1 = random_transform(&mut rng, pos_range.to_owned(), angle_range.to_owned());
+
+        let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
+        let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
+
+        group.bench_function(BenchmarkId::from_parameter(i), |b| b.iter(|| 
+            gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1)
+        ));
+    }
+    group.finish();
+}
+
+
+criterion_group!(benches, original_benchmark, nasterov_benchmark);
+criterion_main!(benches);
 
 

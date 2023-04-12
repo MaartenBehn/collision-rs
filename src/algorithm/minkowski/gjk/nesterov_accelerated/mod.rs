@@ -32,7 +32,7 @@ where
         left_transform: &TL,
         right: &PR,
         right_transform: &TR,
-    ) -> Option<Simplex<Point3<S>>>
+    ) -> (Option<Simplex<Point3<S>>>, S)
     where
         PL: Primitive<Point = Point3<S>>,
         PR: Primitive<Point = Point3<S>>,
@@ -134,9 +134,7 @@ where
             }
         }
 
-        println!("Distance: {:?}", distance);
-
-        return if inside { Some(data.simplex) } else { None };
+        return (if inside { Some(data.simplex) } else { None }, distance );
     }
 
     fn check_convergence(&self, data: &mut NesterovData<S>) -> bool {
@@ -594,7 +592,7 @@ mod tests {
         let shape = Cuboid::new(1., 1., 1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let p = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -603,7 +601,7 @@ mod tests {
         let shape = Sphere::new(1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let p = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -649,11 +647,7 @@ mod tests {
             let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
             let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
 
-            if i == 525 {
-                print!("Debug")
-            }
-
-            let p =
+            let (p, _dist) =
                 gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
             let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
 

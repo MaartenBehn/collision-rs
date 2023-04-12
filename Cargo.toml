@@ -45,3 +45,8 @@ num = "0.4.0"
 
 [dev-dependencies]
 genmesh = "0.5"
+criterion = { version = "0.4", features = ["html_reports"]}
+
+[[bench]]
+name = "gjk"
+harness = false
