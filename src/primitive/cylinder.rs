@@ -1,5 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::{BaseFloat, Point3, Vector3};
+use json::JsonValue;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
 
@@ -46,6 +47,22 @@ where
             half_height,
             radius,
         }
+    }
+
+    /// Create a random cylinder from json.
+    pub fn from_json(json_data: JsonValue) -> (Cylinder<f32>, [f32; 3])
+    {
+        assert!(json_data["type"] == "Cylinder");
+        
+        let center = [
+            json_data["center"][0].as_f32().unwrap(), 
+            json_data["center"][1].as_f32().unwrap(), 
+            json_data["center"][2].as_f32().unwrap()];
+
+        let radius = json_data["radius"].as_f32().unwrap();
+        let height = json_data["height"].as_f32().unwrap();
+
+        (Cylinder::new(height / 2.0, radius), center)
     }
 
     /// Get radius

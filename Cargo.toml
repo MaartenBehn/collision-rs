@@ -42,6 +42,7 @@ serde_crate = { version = "1.0.126", package="serde", optional = true, features 
 bit-set = "0.5.2"
 smallvec = "1.6.1"
 num = "0.4.0"
+json = "0.12"
 
 [dev-dependencies]
 genmesh = "0.5"
