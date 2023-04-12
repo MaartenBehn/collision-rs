@@ -709,7 +709,7 @@ mod tests {
             
             
 
-            let (p, dist) = gjk.intersect_nesterov_accelerated(&shape0, &t0, &shape1, &t1);
+            let (p, _) = gjk.intersect_nesterov_accelerated(&shape0, &t0, &shape1, &t1);
 
             assert!(p.is_some() == (distance == 0.0));
 
