@@ -1,9 +1,10 @@
 //! Wrapper enum for 3D primitives
 
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Matrix4};
 use cgmath::{BaseFloat, Point3, Vector3};
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
+use serde_json::Value;
 
 use crate::prelude::*;
 use crate::primitive::{
@@ -246,6 +247,25 @@ where
             3 => Primitive3::Cuboid(Cuboid::new_random(rng, size_range)),
             4 => Primitive3::Cube(Cube::new_random(rng, size_range)),
             _ => Primitive3::Sphere(Sphere::new_random(rng, size_range)),
+        }
+    }
+
+    /// TODO
+    pub fn from_json(json_obj: &Value) -> (Primitive3<f64>, Matrix4<f64>) {
+        if json_obj["typ"] == "Cylinder" {
+            let (cylinder, transform) = Cylinder::<f64>::from_json(&json_obj);
+            return (Primitive3::Cylinder(cylinder), transform);
+        }
+        else if json_obj["typ"] == "Capsule" {
+            let (capsule, transform) = Capsule::<f64>::from_json(&json_obj);
+            return (Primitive3::Capsule(capsule), transform);
+        }
+        else if json_obj["typ"] == "Sphere" {
+            let (sphere, transform) = Sphere::<f64>::from_json(&json_obj);
+            return (Primitive3::Sphere(sphere), transform);
+        }
+        else {
+            panic!("Invalid type");
         }
     }
 }

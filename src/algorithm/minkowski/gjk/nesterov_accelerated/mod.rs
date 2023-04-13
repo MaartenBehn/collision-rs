@@ -1,6 +1,6 @@
 use std::ops::Neg;
 
-use cgmath::{vec3, Array, BaseFloat, InnerSpace, Point3, Transform, Vector3, Zero, point3};
+use cgmath::{vec3, Array, BaseFloat, InnerSpace, Point3, Transform, Vector3, Zero, point3, EuclideanSpace};
 
 use crate::{algorithm::minkowski::SupportPoint, Primitive};
 
@@ -32,7 +32,7 @@ where
         left_transform: &TL,
         right: &PR,
         right_transform: &TR,
-    ) -> (Option<Simplex<Point3<S>>>, S)
+    ) -> (Option<Simplex<Point3<S>>>, S, u32)
     where
         PL: Primitive<Point = Point3<S>>,
         PR: Primitive<Point = Point3<S>>,
@@ -49,10 +49,17 @@ where
         let mut inside = false;
         let mut distance = S::zero();
 
-        let mut data = NesterovData::new(None, self.distance_tolerance);
+        let left_pos = left_transform.transform_point(Point3::origin());
+        let right_pos = right_transform.transform_point(Point3::origin());
+        let guess = left_pos - right_pos;
+
+        let mut data = NesterovData::new(Some(guess), self.distance_tolerance);
+
+        let mut interations = 0;
 
         for i in 0..self.max_iterations {
             let k = i as f64;
+            interations = i;
 
             if data.ray_len < self.distance_tolerance {
                 distance = -inflation;
@@ -134,7 +141,7 @@ where
             }
         }
 
-        return (if inside { Some(data.simplex) } else { None }, distance );
+        return (if inside { Some(data.simplex) } else { None }, distance ,interations);
     }
 
     fn check_convergence(&self, data: &mut NesterovData<S>) -> bool {
@@ -575,15 +582,15 @@ mod tests {
 
     use crate::{
         algorithm::minkowski::GJK3,
-        primitive::{Cuboid, Primitive3, Sphere, Cylinder, Capsule},
+        primitive::{Cuboid, Primitive3, Sphere},
     };
     use cgmath::{BaseFloat, Decomposed, Quaternion, Rad, Rotation3, Vector3};
-    use json::JsonValue;
     use rand::{
         distributions::uniform::{SampleRange, SampleUniform},
         rngs::StdRng,
         Rng, SeedableRng,
     };
+    use serde_json::Value;
 
     fn transform_3d(
         x: f32,
@@ -603,7 +610,7 @@ mod tests {
         let shape = Cuboid::new(1., 1., 1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let (p, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -612,7 +619,7 @@ mod tests {
         let shape = Sphere::new(1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let (p, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -658,62 +665,89 @@ mod tests {
             let shape_0 = Primitive3::new_random(&mut rng, size_range.to_owned());
             let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
 
-            let (p, _dist) =
-                gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
-            let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
+            
+            let test_p = gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1).0;
+            
+            if i == 791 {
+                print!("Break")
+            }
+            
+            let (p, _dist, _) = gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
 
             assert!((p.is_some() == test_p.is_some()));
         }
     }
 
-    fn parse_collider(json_obj: &JsonValue) -> (Primitive3<f32>, [f32; 3]) {
-        if json_obj["type"] == "Cylinder" {
-            let (cylinder, center) = Cylinder::<f32>::from_json(json_obj.to_owned());
-            return (Primitive3::Cylinder(cylinder), center);
-        }
-        else if json_obj["type"] == "Capsule" {
-            let (capsule, center) = Capsule::<f32>::from_json(json_obj.to_owned());
-            return (Primitive3::Capsule(capsule), center);
-        }
-        else if json_obj["type"] == "Sphere" {
-            let (sphere, center) = Sphere::<f32>::from_json(json_obj.to_owned());
-            return (Primitive3::Sphere(sphere), center);
-        }
-        else {
-            panic!("Invalid type");
-        }
+    #[test]
+    fn test_file_assert_simplex() {
+        test_file(true, false, false)
     }
 
     #[test]
-    fn test_file() {
+    fn test_file_assert_dist() {
+        test_file(false, true, false)
+    }
+
+    #[test]
+    fn test_file_print_iterations() {
+        test_file(false, false, true)
+    }
+
+    fn test_file(assert_p: bool, asstert_dist: bool, print_iterations: bool) {
         let path = "../data/test_data.json";
         let contents = fs::read_to_string(path).unwrap();
 
-        let json_data = json::parse(&contents).unwrap();
+        let json_data: Value = serde_json::from_str(&contents).unwrap();
 
         let gjk = GJK3::new();
 
         let mut i = 0;
-        for json_obj in json_data.members(){
-            println!("Interation: {:?}", i);
+        let mut original_iteration_sum = 0;
+        let mut nasterov_iteration_sum = 0;
+
+        for json_obj in json_data.as_array().unwrap() {
+            println!("Case: {:?}", i);
 
             let collider1 = &json_obj["collider1"];
             let collider2 = &json_obj["collider2"];
-            let distance = json_obj["distance"].as_f32().unwrap();
+            let test_dist = json_obj["distance"].as_f64().unwrap();
 
-            let (shape0, center0) = parse_collider(collider1);
-            let (shape1, center1) = parse_collider(collider2);
+            let (shape0, transform0) = Primitive3::<f64>::from_json(collider1);
+            let (shape1, transform1) = Primitive3::<f64>::from_json(collider2);
 
-            let t0 = transform_3d(center0[0], center0[1], center0[2], 0.);
-            let t1 = transform_3d(center1[0], center1[1], center1[2], 0.);
+            let (original_simplex, original_interations) = gjk.intersect(
+                &shape0, 
+                &transform0, 
+                &shape1, 
+                &transform1);
+
+            let (nasterov_simplex, nasterov_distance, nasterov_interations) = gjk.intersect_nesterov_accelerated(
+                &shape0, 
+                &transform0, 
+                &shape1, 
+                &transform1);
             
+            if assert_p{
+                assert!(original_simplex.is_some() == nasterov_simplex.is_some());
+            }
             
+            if asstert_dist{
+                assert!((test_dist - nasterov_distance).abs() < 0.1);
+            }  
 
-            let (p, _) = gjk.intersect_nesterov_accelerated(&shape0, &t0, &shape1, &t1);
-
-            assert!(p.is_some() == (distance == 0.0));
-
+            if print_iterations {
+                println!("Orignial Simplex is Some {:?} Interations: {original_interations}", original_simplex.is_some());  
+                println!("Nasterov Simplex is Some {:?} Interations: {nasterov_interations}", nasterov_simplex.is_some()); 
+                original_iteration_sum += original_interations;
+                nasterov_iteration_sum += nasterov_interations;
+            }
+                   
             i += 1;
+        }
+
+        if print_iterations {
+            println!("Orignial Interations per Case: {:?}", (original_iteration_sum as f32) / json_data.as_array().unwrap().len() as f32); 
+            println!("Nasterov Interations per Case: {:?}", (nasterov_iteration_sum as f32) / json_data.as_array().unwrap().len() as f32);
         }
     }
 }

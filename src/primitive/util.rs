@@ -5,8 +5,9 @@ use std::ops::Neg;
 
 use crate::{Aabb, Ray3};
 use cgmath::num_traits::Float;
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Vector3, vec3, Vector4, vec4, Matrix4};
 use cgmath::{BaseFloat, BaseNum, Vector2};
+use serde_json::Value;
 
 pub(crate) fn get_max_point<'a, P: 'a, T, I>(vertices: I, direction: &P::Diff, transform: &T) -> P
 where
@@ -132,6 +133,32 @@ where
     let t1 = (-b + drsqrt) / (two * a);
     let t2 = (-b - drsqrt) / (two * a);
     Some((t1, t2))
+}
+
+pub fn parse_vec3(json_obj: &Value) -> Vector3<f64> {
+    vec3(
+        json_obj[0].as_f64().unwrap(),
+        json_obj[1].as_f64().unwrap(),
+        json_obj[2].as_f64().unwrap(),
+    )
+}
+
+pub fn parse_vec4(json_obj: &Value) -> Vector4<f64> {
+    vec4(
+        json_obj[0].as_f64().unwrap(),
+        json_obj[1].as_f64().unwrap(),
+        json_obj[2].as_f64().unwrap(),
+        json_obj[3].as_f64().unwrap(),
+    )
+}
+
+pub fn parse_mat4(json_obj: &Value) -> Matrix4<f64> {
+    Matrix4::from_cols(
+        parse_vec4(&json_obj[0]),
+        parse_vec4(&json_obj[1]),
+        parse_vec4(&json_obj[2]),
+        parse_vec4(&json_obj[3]),
+    ).transpose()
 }
 
 #[cfg(test)]

@@ -162,7 +162,7 @@ mod tests {
         let transform_2 = transform(0., 0., 1.1);
         let gjk = GJK3::new();
         assert!(gjk
-            .intersect(&quad, &transform_1, &cuboid, &transform_2)
+            .intersect(&quad, &transform_1, &cuboid, &transform_2).0
             .is_some());
     }
 }

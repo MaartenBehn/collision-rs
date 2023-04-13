@@ -1,10 +1,11 @@
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Matrix4};
 use cgmath::{BaseFloat, Point3, Vector3};
-use json::JsonValue;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
+use serde_json::Value;
 
 use crate::prelude::*;
+use crate::primitive::util::parse_vec3;
 use crate::{Aabb3, Ray3};
 
 /// Sphere primitive
@@ -37,18 +38,15 @@ impl<S> Sphere<S> {
     }
 
     /// Create a random sphere from json.
-    pub fn from_json(json_data: JsonValue) -> (Sphere<f32>, [f32; 3])
+    pub fn from_json(json_data: &Value) -> (Sphere<f64>, Matrix4<f64>)
     {
-        assert!(json_data["type"] == "Sphere");
+        assert!(json_data["typ"] == "Sphere");
         
-        let center = [
-            json_data["center"][0].as_f32().unwrap(), 
-            json_data["center"][1].as_f32().unwrap(), 
-            json_data["center"][2].as_f32().unwrap()];
+        let center = parse_vec3(&json_data["center"]);
 
-        let radius = json_data["radius"].as_f32().unwrap();
+        let radius = json_data["radius"].as_f64().unwrap();
 
-        (Sphere::new(radius), center)
+        (Sphere::new(radius), Matrix4::from_translation(center))
     }
 }
 

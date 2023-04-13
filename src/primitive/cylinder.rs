@@ -1,11 +1,11 @@
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Matrix4};
 use cgmath::{BaseFloat, Point3, Vector3};
-use json::JsonValue;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use rand::Rng;
+use serde_json::Value;
 
 use crate::prelude::*;
-use crate::primitive::util::cylinder_ray_quadratic_solve;
+use crate::primitive::util::{cylinder_ray_quadratic_solve, parse_mat4};
 use crate::volume::Sphere;
 use crate::{Aabb3, Ray3};
 
@@ -50,19 +50,16 @@ where
     }
 
     /// Create a random cylinder from json.
-    pub fn from_json(json_data: JsonValue) -> (Cylinder<f32>, [f32; 3])
+    pub fn from_json(json_data: &Value) -> (Cylinder<f64>, Matrix4<f64>)
     {
-        assert!(json_data["type"] == "Cylinder");
+        assert!(json_data["typ"] == "Cylinder");
         
-        let center = [
-            json_data["center"][0].as_f32().unwrap(), 
-            json_data["center"][1].as_f32().unwrap(), 
-            json_data["center"][2].as_f32().unwrap()];
+        let collider2origin = parse_mat4(&json_data["collider2origin"]);
 
-        let radius = json_data["radius"].as_f32().unwrap();
-        let height = json_data["height"].as_f32().unwrap();
+        let radius = json_data["radius"].as_f64().unwrap();
+        let height = json_data["height"].as_f64().unwrap();
 
-        (Cylinder::new(height / 2.0, radius), center)
+        (Cylinder::new(height / 2.0, radius), collider2origin)
     }
 
     /// Get radius

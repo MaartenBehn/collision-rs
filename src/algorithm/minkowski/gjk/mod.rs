@@ -105,7 +105,7 @@ where
         left_transform: &TL,
         right: &PR,
         right_transform: &TR,
-    ) -> Option<Simplex<P>>
+    ) -> (Option<Simplex<P>>, u32)
     where
         P: EuclideanSpace<Scalar = S>,
         PL: Primitive<Point = P>,
@@ -123,27 +123,29 @@ where
         }
         let a = SupportPoint::from_minkowski(left, left_transform, right, right_transform, &d);
         if a.v.dot(d) <= S::zero() {
-            return None;
+            return (None, 0);
         }
         let mut simplex = Simplex::new();
         simplex.push(a);
         d = d.neg();
-        for _ in 0..self.max_iterations {
+
+
+        for i in 0..self.max_iterations {
             let a = SupportPoint::from_minkowski(left, left_transform, right, right_transform, &d);
             if a.v.dot(d) <= S::zero() {
-                return None;
+                return (None, i);
             } else {
                 simplex.push(a);
                 if self
                     .simplex_processor
                     .reduce_to_closest_feature(&mut simplex, &mut d)
                 {
-                    return Some(simplex);
+                    return (Some(simplex), i);
                 }
             }
         }
 
-        None
+        (None, self.max_iterations - 1)
     }
 
     /// Do time of impact intersection testing on the given primitives, and return a valid contact
@@ -378,7 +380,7 @@ where
         SP: SimplexProcessor<Point = P>,
     {
         use CollisionStrategy::*;
-        self.intersect(left, left_transform, right, right_transform)
+        self.intersect(left, left_transform, right, right_transform).0
             .and_then(|simplex| match *strategy {
                 CollisionOnly => Some(Contact::new(CollisionOnly)),
                 FullResolution => self.get_contact_manifold(
@@ -661,7 +663,7 @@ mod tests {
         let right_transform = transform(-15., 0., 0.);
         let gjk = GJK2::new();
         assert!(gjk
-            .intersect(&left, &left_transform, &right, &right_transform)
+            .intersect(&left, &left_transform, &right, &right_transform).0
             .is_none());
         assert!(gjk
             .intersection(
@@ -681,7 +683,7 @@ mod tests {
         let right = Rectangle::new(10., 10.);
         let right_transform = transform(7., 2., 0.);
         let gjk = GJK2::new();
-        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform);
+        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform).0;
         assert!(simplex.is_some());
         let contact = gjk.intersection(
             &CollisionStrategy::FullResolution,
@@ -704,7 +706,7 @@ mod tests {
         let right = Cuboid::new(10., 10., 10.);
         let right_transform = transform_3d(7., 2., 0., 0.);
         let gjk = GJK3::new();
-        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform);
+        let simplex = gjk.intersect(&left, &left_transform, &right, &right_transform).0;
         assert!(simplex.is_some());
         let contact = gjk.intersection(
             &CollisionStrategy::FullResolution,
