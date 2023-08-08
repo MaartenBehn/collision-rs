@@ -39,6 +39,6 @@ fn main() {
         let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
 
         gjk.intersect(&shape_0, &transform_0, &shape_1, &transform_1);
-        gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
+        gjk.distance_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
     }
 }

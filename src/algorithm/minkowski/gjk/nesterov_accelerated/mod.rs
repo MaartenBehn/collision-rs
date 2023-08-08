@@ -26,7 +26,7 @@ where
     S: BaseFloat,
 {
     /// TODO
-    pub fn intersect_nesterov_accelerated<PL, PR, TL, TR>(
+    pub fn distance_nesterov_accelerated<PL, PR, TL, TR>(
         &self,
         left: &PL,
         left_transform: &TL,
@@ -610,7 +610,7 @@ mod tests {
         let shape = Cuboid::new(1., 1., 1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let (p, _, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _, _) = gjk.distance_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -619,7 +619,7 @@ mod tests {
         let shape = Sphere::new(1.);
         let t = transform_3d(0., 0., 0., 0.);
         let gjk = GJK3::new();
-        let (p, _, _) = gjk.intersect_nesterov_accelerated(&shape, &t, &shape, &t);
+        let (p, _, _) = gjk.distance_nesterov_accelerated(&shape, &t, &shape, &t);
         assert!(p.is_some());
     }
 
@@ -672,7 +672,7 @@ mod tests {
                 print!("Break")
             }
             
-            let (p, _dist, _) = gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
+            let (p, _dist, _) = gjk.distance_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1);
 
             assert!((p.is_some() == test_p.is_some()));
         }
@@ -721,7 +721,7 @@ mod tests {
                 &shape1, 
                 &transform1);
 
-            let (nasterov_simplex, nasterov_distance, nasterov_interations) = gjk.intersect_nesterov_accelerated(
+            let (nasterov_simplex, nasterov_distance, nasterov_interations) = gjk.distance_nesterov_accelerated(
                 &shape0, 
                 &transform0, 
                 &shape1, 

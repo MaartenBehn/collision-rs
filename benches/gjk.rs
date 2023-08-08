@@ -70,7 +70,7 @@ fn nasterov_benchmark(c: &mut Criterion) {
         let shape_1 = Primitive3::new_random(&mut rng, size_range.to_owned());
 
         group.bench_function(BenchmarkId::from_parameter(i), |b| b.iter(|| 
-            gjk.intersect_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1)
+            gjk.distance_nesterov_accelerated(&shape_0, &transform_0, &shape_1, &transform_1)
         ));
     }
     group.finish();
@@ -104,7 +104,7 @@ fn collider_to_transform_and_primitive(collider: &Collider) -> (Matrix4<f64>, Pr
 }
 
 fn load_data() -> Vec<((Matrix4<f64>, Primitive3<f64>), (Matrix4<f64>, Primitive3<f64>))>{
-    let path = "../data/test_data.json";
+    let path = "../data/nao_test_cases.json";
     let test_data = load_test_file(path);
 
     let mut cases = Vec::new();
@@ -121,16 +121,30 @@ fn original_benchmark_test_file(c: &mut Criterion) {
 
     let gjk = GJK3::new();
 
-    let mut group = c.benchmark_group("original_gjk");
+    c.bench_function("original_intersect_gjk", |b| b.iter(|| 
+        for i in 0..cases.len() {
+            let ((transform_0, shape_0), (transform_1, shape_1)) = &cases[i];
+            gjk.intersect(shape_0, transform_0, shape_1, transform_1);
+        }
+    ));
 
-    for i in 0..cases.len() {
-        let ((transform_0, shape_0), (transform_1, shape_1)) = &cases[i];
+    print!("Cases: {:?}", cases.len());
+}
 
-        group.bench_function(BenchmarkId::from_parameter(i), |b| b.iter(|| 
-            gjk.intersect(shape_0, transform_0, shape_1, transform_1)
-        ));
-    }
-    group.finish();
+fn original_distance_benchmark_test_file(c: &mut Criterion) {
+
+    let cases = load_data();
+
+    let gjk = GJK3::new();
+
+    c.bench_function("original_distance_gjk", |b| b.iter(|| 
+        for i in 0..cases.len() {
+            let ((transform_0, shape_0), (transform_1, shape_1)) = &cases[i];
+            gjk.distance(shape_0, transform_0, shape_1, transform_1);
+        }
+    ));
+
+    print!("Cases: {:?}", cases.len());
 }
 
 fn nasterov_benchmark_test_file(c: &mut Criterion) {
@@ -139,20 +153,17 @@ fn nasterov_benchmark_test_file(c: &mut Criterion) {
 
     let gjk = GJK3::new();
 
-    let mut group = c.benchmark_group("nasterov_gjk");
+    c.bench_function("nasterov_gjk", |b| b.iter(|| 
+        for i in 0..cases.len() {
+            let ((transform_0, shape_0), (transform_1, shape_1)) = &cases[i];
+            gjk.distance_nesterov_accelerated(shape_0, transform_0, shape_1, transform_1);
+        }
+    ));
 
-    for i in 0..cases.len() {
-        let ((transform_0, shape_0), (transform_1, shape_1)) = &cases[i];
-
-        group.bench_function(BenchmarkId::from_parameter(i), |b| b.iter(|| 
-            gjk.intersect(shape_0, transform_0, shape_1, transform_1)
-        ));
-    }
-    group.finish();
+    print!("Cases: {:?}", cases.len());
 }
 
-//criterion_group!(benches, original_benchmark, nasterov_benchmark);
-criterion_group!(benches, original_benchmark_test_file, nasterov_benchmark_test_file);
+criterion_group!(benches, original_benchmark_test_file, original_distance_benchmark_test_file, nasterov_benchmark_test_file);
 criterion_main!(benches);
 
 
